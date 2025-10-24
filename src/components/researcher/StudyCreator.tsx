@@ -51,7 +51,7 @@ const getDefaultStudy = (): Study => ({
 });
 
 export const StudyCreator = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const {id: study_id} = useParams();
   const [studyData, setStudyData] = useState<Study>(getDefaultStudy());
   const [studyType, setStudyType] = useState<'paid' | 'free' | null>(null);
@@ -62,6 +62,12 @@ export const StudyCreator = () => {
   const [newRequirement, setNewRequirement] = useState('');
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     if (!study_id || !user?.id) return;
@@ -999,6 +1005,21 @@ export const StudyCreator = () => {
         return null;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   if (showFormBuilder) {
     return (
