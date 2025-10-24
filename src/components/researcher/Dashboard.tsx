@@ -25,7 +25,9 @@ import {
 import { StudyCreator } from './StudyCreator';
 import { StudyBrowser } from './StudyBrowser';
 import { DashboardHeader } from './DashboardHeader';
+import { StudyDataView } from './StudyDataView';
 import { Navigate, useNavigate } from 'react-router';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Study {
   id: string;
@@ -53,6 +55,7 @@ export const Dashboard = ({ onBack }: DashboardProps) => {
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<'researcher' | 'participant'>('participant');
+  const [selectedStudyForData, setSelectedStudyForData] = useState<Study | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -304,9 +307,14 @@ export const Dashboard = ({ onBack }: DashboardProps) => {
                       </div>
 
                       <div className="flex gap-2 pt-2">
-                        <Button variant="outline" size="sm" className="flex-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setSelectedStudyForData(study)}
+                        >
                           <Download className="h-4 w-4 mr-2" />
-                          Export Data
+                          Data Files
                         </Button>
                         <Button variant="outline" size="sm" className="flex-1">
                           <BarChart3 className="h-4 w-4 mr-2" />
@@ -424,17 +432,33 @@ export const Dashboard = ({ onBack }: DashboardProps) => {
   };
 
   return (
-    <div className="w-full flex bg-background">
-      <ModernSidebar 
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-        onLogout={onBack}
-      />
-      
-      <main className="p-6 w-full">
-        <DashboardHeader role={role} setRole={setRole}/>
-        {renderCurrentView()}
-      </main>
-    </div>
+    <>
+      <div className="w-full flex bg-background">
+        <ModernSidebar
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          onLogout={onBack}
+        />
+
+        <main className="p-6 w-full">
+          <DashboardHeader role={role} setRole={setRole}/>
+          {renderCurrentView()}
+        </main>
+      </div>
+
+      <Dialog open={!!selectedStudyForData} onOpenChange={() => setSelectedStudyForData(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Study Data Files - {selectedStudyForData?.title}</DialogTitle>
+          </DialogHeader>
+          {selectedStudyForData && (
+            <StudyDataView
+              studyId={selectedStudyForData.id}
+              studyTitle={selectedStudyForData.title}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
