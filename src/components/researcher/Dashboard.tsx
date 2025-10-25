@@ -7,6 +7,7 @@ import { ConversationsView } from './ConversationsView';
 import { ParticipantGroupsView } from './ParticipantGroupsView';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Plus, 
   BarChart3, 
@@ -28,6 +29,7 @@ import { DashboardHeader } from './DashboardHeader';
 import { StudyDataView } from './StudyDataView';
 import { Navigate, useNavigate } from 'react-router';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { exportFormResponsesToCSV, getResponseCount } from '@/services/csvExportService';
 
 interface Study {
   id: string;
@@ -50,17 +52,37 @@ interface DashboardProps {
 
 export const Dashboard = ({ onBack }: DashboardProps) => {
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<'dashboard' | 'conversations' | 'participant-groups'>('dashboard');
   const [showStudyBrowser, setShowStudyBrowser] = useState(false);
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<'researcher' | 'participant'>('participant');
   const [selectedStudyForData, setSelectedStudyForData] = useState<Study | null>(null);
+  const [exportingStudyId, setExportingStudyId] = useState<string | null>(null);
+  const [responseCounts, setResponseCounts] = useState<Record<string, number>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
     loadStudies();
   }, [user]);
+
+  useEffect(() => {
+    const loadResponseCounts = async () => {
+      if (studies.length === 0) return;
+
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        studies.map(async (study) => {
+          const count = await getResponseCount(study.id);
+          counts[study.id] = count;
+        })
+      );
+      setResponseCounts(counts);
+    };
+
+    loadResponseCounts();
+  }, [studies]);
 
   const notifications = [
     { id: 1, message: "New message from John" },
@@ -112,6 +134,26 @@ export const Dashboard = ({ onBack }: DashboardProps) => {
     active_studies: studies.filter(s => s.status === 'active').length,
     total_participants: studies.reduce((sum, s) => sum + s.participants_current, 0),
     total_spent: studies.reduce((sum, s) => sum + (s.participants_current * s.compensation), 0)
+  };
+
+  const handleExportResponses = async (study: Study) => {
+    try {
+      setExportingStudyId(study.id);
+      await exportFormResponsesToCSV(study.id, study.title);
+      toast({
+        title: 'Export successful',
+        description: `Form responses exported to CSV file`
+      });
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export failed',
+        description: error.message || 'Failed to export responses',
+        variant: 'destructive'
+      });
+    } finally {
+      setExportingStudyId(null);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -311,14 +353,29 @@ export const Dashboard = ({ onBack }: DashboardProps) => {
                           variant="outline"
                           size="sm"
                           className="flex-1"
+                          onClick={() => handleExportResponses(study)}
+                          disabled={exportingStudyId === study.id || (responseCounts[study.id] || 0) === 0}
+                        >
+                          {exportingStudyId === study.id ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-2"></div>
+                              Exporting...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              Export Data ({responseCounts[study.id] || 0})
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
                           onClick={() => setSelectedStudyForData(study)}
                         >
-                          <Download className="h-4 w-4 mr-2" />
-                          Data Files
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex-1">
                           <BarChart3 className="h-4 w-4 mr-2" />
-                          Analytics
+                          Data Files
                         </Button>
                       </div>
                     </CardContent>
